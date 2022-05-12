@@ -269,6 +269,78 @@ class MapillaryDataset(object):
             bboxes.append(utils.mask_to_bbox(modal[i,...]))
         return modal, category, np.array(bboxes), None, image_fn
 
+class CustomDataset(object): # NYUCADrender
+
+    def __init__(self, root, annot_fn):
+        with open(annot_fn, 'r') as f:
+            annot = json.load(f)
+        # self.categories = annot['categories']
+        self.annot_info = annot['images']
+        self.root = root # e.g., "data/manpillary/training"
+        self.indexing = []
+        for i, ann in enumerate(self.annot_info):
+            for j in range(len(ann['regions'])):
+                self.indexing.append((i, j))
+
+    def get_instance_length(self):
+        return len(self.indexing)
+
+    def get_image_length(self):
+        return len(self.annot_info)
+
+    def get_instance(self, idx, with_gt=False):
+        assert not with_gt, \
+            "CustomDataset without ground truth for ordering or amodal masks."
+        imgidx, regidx = self.indexing[idx]
+        # img
+        image_id = self.annot_info[imgidx]['image_id']
+        # image_fn = image_id + "_color.jpg"
+        image_fn = image_id + ".png"
+        # region
+        instance_map = np.array(
+            Image.open("{}/{}_instance.png".format(
+            self.root, image_id)), dtype=np.uint16)
+        label_map = np.array(
+            Image.open("{}/{}_labels_suncg.png".format(
+            self.root, image_id)), dtype=np.uint16)
+        h, w = instance_map.shape[:2]
+        reg_info = self.annot_info[imgidx]['regions'][regidx]
+        modal = (instance_map == reg_info['instance_id']).astype(np.uint8)
+        category = np.unique(label_map * modal)[-1]
+        bbox = np.array(utils.mask_to_bbox(modal))
+        return modal, bbox, category, image_fn, None
+
+    def get_image_instances(self, idx, with_gt=False, with_anns=False, ignore_stuff=False):
+        assert not with_gt
+        assert not ignore_stuff
+        # img
+        image_id = self.annot_info[idx]['image_id']
+        # image_fn = image_id + "_color.jpg"
+        image_fn = image_id + ".png"
+        # region
+        instance_map = np.array(
+            Image.open("{}/{}_instance.png".format(
+            self.root, image_id)), dtype=np.uint16)
+        label_map = np.array(
+            Image.open("{}/{}_labels_suncg.png".format(
+            self.root, image_id)), dtype=np.uint16)
+        h, w = instance_map.shape[:2]
+        instance_ids = np.unique(instance_map)
+        if instance_ids[0] == 0:
+            instance_ids = instance_ids[1:]
+        category_list = []
+        for i in instance_ids:
+            _mask = np.where(instance_map == i)
+            category = np.unique(label_map[_mask])[0]
+            category_list.append(category)
+        num_instance = len(instance_ids)
+        instance_ids_tensor = np.zeros((num_instance, h, w), dtype=np.uint16)
+        instance_ids_tensor[...] = instance_ids[:, np.newaxis, np.newaxis]
+        modal = (instance_ids_tensor == instance_map).astype(np.uint8)
+        bboxes = []
+        for i in range(modal.shape[0]):
+            bboxes.append(utils.mask_to_bbox(modal[i,...]))
+        return modal, np.array(category_list), np.array(bboxes), None, image_fn
 
 def mask_to_polygon(mask, tolerance=1.0, area_threshold=1):
     """Convert object's mask to polygon [[x1,y1, x2,y2 ...], [...]]
