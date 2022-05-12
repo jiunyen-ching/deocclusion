@@ -22,6 +22,9 @@ class PartialCompContentDataset(Dataset):
         self.dataset = config['dataset']
         if self.dataset == 'COCOA':
             self.data_reader = reader.COCOADataset(config['{}_annot_file'.format(phase)])
+        elif self.dataset == 'CUSTOM':
+            self.data_reader = reader.CustomDataset(
+                config['{}_image_root'.format(phase)], config['{}_annot_file'.format(phase)])
         else:
             self.data_reader = reader.KINSLVISDataset(
                 self.dataset, config['{}_annot_file'.format(phase)])
@@ -94,8 +97,18 @@ class PartialCompContentDataset(Dataset):
             flip = False
 
         if load_rgb:
-            rgb = np.array(self._load_image(os.path.join(
-                self.config['{}_image_root'.format(self.phase)], imgfn))) # uint8
+            if self.dataset == 'CUSTOM':
+                if self.phase == 'val':
+                    phase = 'test' # my own val folder uses 'test' as name
+                else:
+                    phase = 'train'
+                root = os.path.dirname(self.config['{}_image_root'.format(self.phase)])
+                rgb_folder = os.path.join(root, 'depthbin_eval/depthbin/NYUCAD/NYUCAD{}_normal'.format(phase))
+
+                rgb = np.array(self._load_image(os.path.join(rgb_folder, imgfn))) # uint8
+            else:
+                rgb = np.array(self._load_image(os.path.join(
+                    self.config['{}_image_root'.format(self.phase)], imgfn))) # uint8
             rgb = cv2.resize(utils.crop_padding(rgb, new_bbox, pad_value=(0,0,0)),
                 (self.sz, self.sz), interpolation=cv2.INTER_CUBIC)
             if flip:
