@@ -69,7 +69,8 @@ class MaskWeightedCrossEntropyLoss(nn.Module):
         mask: NHW
         '''
         n, c, h, w = predict.size()
-        mask = mask.byte()
+        # mask = mask.byte() # will give IndexingUtils.h deprecation warning after pytorch 1.5 (i think)
+        mask = mask.type(torch.BoolTensor)
         target_inmask = target[mask]
         target_outmask = target[~mask]
         predict = predict.transpose(1, 2).transpose(2, 3).contiguous()
