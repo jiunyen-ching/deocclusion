@@ -24,6 +24,9 @@ class PartialCompDataset(Dataset):
         elif self.dataset == 'Mapillary':
             self.data_reader = reader.MapillaryDataset(
                 config['{}_root'.format(phase)], config['{}_annot_file'.format(phase)])
+        elif self.dataset == 'CUSTOM':
+            self.data_reader = reader.CustomDataset(
+                config['{}_image_root'.format(phase)], config['{}_annot_file'.format(phase)])   
         else:
             self.data_reader = reader.KINSLVISDataset(
                 self.dataset, config['{}_annot_file'.format(phase)])
